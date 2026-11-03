@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 960" width="1240" height="960" role="img" aria-labelledby="t d">
+<title id="t">Plateful architecture</title>
+<desc id="d">Three tiers: a React browser app calls a layered FastAPI backend over HTTP and JSON. The backend reads and writes PostgreSQL through SQLAlchemy.</desc>
+<defs>
+  <filter id="sh" x="-5%" y="-5%" width="110%" height="125%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#11201a" flood-opacity=".12"/></filter>
+  <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#11201a"/></marker>
+  <marker id="ah-s" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#11201a"/></marker>
+  <style>
+    text { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    .title { font-size: 28px; font-weight: 800; fill: #06382a; }
+    .sub { font-size: 14px; fill: #5a6a62; }
+    .band { font-size: 15px; font-weight: 700; }
+    .bt { font-size: 15px; font-weight: 700; fill: #11201a; }
+    .bl { font-size: 12.5px; fill: #3d4c45; }
+    .chip { font-size: 12.5px; font-weight: 600; fill: #5a3b00; }
+    .lbl { font-size: 13px; font-weight: 700; fill: #11201a; }
+    .lbl2 { font-size: 12.5px; fill: #4a5a53; }
+  </style>
+</defs>
+<rect width="1240" height="960" fill="#f6f9f6"/>
+<text x="32" y="46" class="title">Plateful architecture</text>
+<text x="32" y="70" class="sub">React + TypeScript frontend, layered FastAPI backend, PostgreSQL database. Everything runs on your own computer.</text>
+<rect x="20" y="90" width="1200" height="175" rx="22" fill="#e6f4ec" stroke="#0c7a54" stroke-width="1.5"/>
+<text x="42" y="120" class="band" fill="#0c7a54">1. Browser: React + TypeScript (Vite dev server, http://localhost:5173)</text>
+<rect x="32" y="135" width="275" height="112" rx="14" fill="#fff" stroke="#0c7a54" stroke-width="1.5" filter="url(#sh)"/>
+<text x="48" y="162" class="bt">Pages</text>
+<text x="48" y="187" class="bl">Restaurants, Menu, Cart, Checkout</text>
+<text x="48" y="207" class="bl">Orders, Order detail, Profile</text>
+<text x="48" y="227" class="bl">Staff orders, Login, Register</text>
+<rect x="332" y="135" width="275" height="112" rx="14" fill="#fff" stroke="#0c7a54" stroke-width="1.5" filter="url(#sh)"/>
+<text x="348" y="162" class="bt">Contexts</text>
+<text x="348" y="187" class="bl">AuthContext: user + access token</text>
+<text x="348" y="207" class="bl">(kept in JS memory only)</text>
+<text x="348" y="227" class="bl">CartContext: item IDs, sessionStorage</text>
+<rect x="632" y="135" width="275" height="112" rx="14" fill="#fff" stroke="#0c7a54" stroke-width="1.5" filter="url(#sh)"/>
+<text x="648" y="162" class="bt">API client (api/client.ts)</text>
+<text x="648" y="187" class="bl">Adds Authorization: Bearer &lt;token&gt;</text>
+<text x="648" y="207" class="bl">On 401: one shared refresh,</text>
+<text x="648" y="227" class="bl">then retries the request once</text>
+<rect x="932" y="135" width="275" height="112" rx="14" fill="#fff5f4" stroke="#b8322a" stroke-width="1.5" filter="url(#sh)"/>
+<text x="948" y="162" class="bt">Cookie jar (browser managed)</text>
+<text x="948" y="187" class="bl">refresh_token: HttpOnly,</text>
+<text x="948" y="207" class="bl">SameSite=Strict, path /auth</text>
+<text x="948" y="227" class="bl">JavaScript can never read it</text>
+<line x1="769" y1="267" x2="769" y2="343" stroke="#11201a" stroke-width="2.2" marker-end="url(#ah)" marker-start="url(#ah-s)"/>
+<text x="787" y="293" class="lbl">JSON over HTTP, CORS limited to the frontend origin</text>
+<text x="787" y="312" class="lbl2">Access JWT travels in the Authorization header</text>
+<text x="787" y="330" class="lbl2">Refresh cookie goes only to /auth/refresh and /auth/logout</text>
+<rect x="20" y="345" width="1200" height="175" rx="22" fill="#eaf0fb" stroke="#3b6cc4" stroke-width="1.5"/>
+<text x="42" y="375" class="band" fill="#3b6cc4">2. Backend: FastAPI + Python (http://localhost:8000)</text>
+<rect x="32" y="390" width="210" height="112" rx="14" fill="#fff" stroke="#3b6cc4" stroke-width="1.5" filter="url(#sh)"/>
+<text x="48" y="417" class="bt">Middleware</text>
+<text x="48" y="442" class="bl">CORS: frontend origin only</text>
+<text x="48" y="462" class="bl">Security headers</text>
+<text x="48" y="482" class="bl">Generic error responses</text>
+<line x1="245" y1="446" x2="269" y2="446" stroke="#3b6cc4" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="272" y="390" width="210" height="112" rx="14" fill="#fff" stroke="#3b6cc4" stroke-width="1.5" filter="url(#sh)"/>
+<text x="288" y="417" class="bt">Routers (thin)</text>
+<text x="288" y="442" class="bl">auth, restaurants, orders,</text>
+<text x="288" y="462" class="bl">staff. Pydantic checks input,</text>
+<text x="288" y="482" class="bl">then a service does the work</text>
+<line x1="485" y1="446" x2="509" y2="446" stroke="#3b6cc4" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="512" y="390" width="210" height="112" rx="14" fill="#fff" stroke="#3b6cc4" stroke-width="1.5" filter="url(#sh)"/>
+<text x="528" y="417" class="bt">Guards (deps.py)</text>
+<text x="528" y="442" class="bl">JWT check and role check</text>
+<text x="528" y="462" class="bl">CSRF check on cookie routes</text>
+<text x="528" y="482" class="bl">Rate limits on login</text>
+<line x1="725" y1="446" x2="749" y2="446" stroke="#3b6cc4" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="752" y="390" width="210" height="112" rx="14" fill="#fff" stroke="#3b6cc4" stroke-width="1.5" filter="url(#sh)"/>
+<text x="768" y="417" class="bt">Services</text>
+<text x="768" y="442" class="bl">Business rules: server-side</text>
+<text x="768" y="462" class="bl">prices, availability, status</text>
+<text x="768" y="482" class="bl">changes, token rotation</text>
+<line x1="965" y1="446" x2="989" y2="446" stroke="#3b6cc4" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="992" y="390" width="210" height="112" rx="14" fill="#fff" stroke="#3b6cc4" stroke-width="1.5" filter="url(#sh)"/>
+<text x="1008" y="417" class="bt">Repositories</text>
+<text x="1008" y="442" class="bl">The only layer with SQL.</text>
+<text x="1008" y="462" class="bl">SQLAlchemy 2, bound</text>
+<text x="1008" y="482" class="bl">parameters, row locks</text>
+<line x1="1097" y1="522" x2="1097" y2="598" stroke="#11201a" stroke-width="2.2" marker-end="url(#ah)" marker-start="url(#ah-s)"/>
+<text x="1079" y="552" class="lbl" text-anchor="end">SQL through SQLAlchemy 2</text>
+<text x="1079" y="571" class="lbl2" text-anchor="end">Parameterised queries only</text>
+<text x="1079" y="589" class="lbl2" text-anchor="end">One transaction per order or status change</text>
+<rect x="20" y="600" width="1200" height="185" rx="22" fill="#fff3d6" stroke="#d49a00" stroke-width="1.5"/>
+<text x="42" y="630" class="band" fill="#d49a00">3. Database: PostgreSQL (localhost:5432)</text>
+<rect x="32" y="645" width="560" height="120" rx="14" fill="#fff" stroke="#d49a00" stroke-width="1.5" filter="url(#sh)"/>
+<text x="48" y="672" class="bt">Tables</text>
+<rect x="48" y="685" width="80" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="88.0" y="705" class="chip" text-anchor="middle">users</text>
+<rect x="138" y="685" width="150" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="213.0" y="705" class="chip" text-anchor="middle">refresh_tokens</text>
+<rect x="298" y="685" width="110" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="353.0" y="705" class="chip" text-anchor="middle">restaurants</text>
+<rect x="418" y="685" width="160" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="498.0" y="705" class="chip" text-anchor="middle">restaurant_staff</text>
+<rect x="48" y="725" width="110" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="103.0" y="745" class="chip" text-anchor="middle">menu_items</text>
+<rect x="168" y="725" width="80" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="208.0" y="745" class="chip" text-anchor="middle">orders</text>
+<rect x="258" y="725" width="110" height="30" rx="15" fill="#fff" stroke="#d49a00" stroke-width="1.3"/>
+<text x="313.0" y="745" class="chip" text-anchor="middle">order_items</text>
+<rect x="612" y="645" width="285" height="120" rx="14" fill="#fff" stroke="#d49a00" stroke-width="1.5" filter="url(#sh)"/>
+<text x="628" y="672" class="bt">Access</text>
+<text x="628" y="697" class="bl">App login: fooddelivery_app,</text>
+<text x="628" y="717" class="bl">not a superuser.</text>
+<text x="628" y="737" class="bl">Databases: fooddelivery and</text>
+<text x="628" y="757" class="bl">fooddelivery_test (tests only)</text>
+<rect x="917" y="645" width="285" height="120" rx="14" fill="#fff" stroke="#d49a00" stroke-width="1.5" filter="url(#sh)"/>
+<text x="933" y="672" class="bt">Migrations (Alembic)</text>
+<text x="933" y="697" class="bl">0001_initial builds every table.</text>
+<text x="933" y="717" class="bl">alembic check finds drift</text>
+<text x="933" y="737" class="bl">between the models and the</text>
+<text x="933" y="757" class="bl">real database.</text>
+<rect x="20" y="805" width="1200" height="142" rx="22" fill="#f1eef9" stroke="#6d4fc2" stroke-width="1.5"/>
+<text x="42" y="835" class="band" fill="#6d4fc2">Developer tools</text>
+<rect x="32" y="852" width="375" height="80" rx="14" fill="#fff" stroke="#6d4fc2" stroke-width="1.5" filter="url(#sh)"/>
+<text x="48" y="879" class="bt">Seed and admin scripts</text>
+<text x="48" y="904" class="bl">seed.py: fictional data only</text>
+<text x="48" y="924" class="bl">create_staff.py: hidden password prompt</text>
+<rect x="429" y="852" width="375" height="80" rx="14" fill="#fff" stroke="#6d4fc2" stroke-width="1.5" filter="url(#sh)"/>
+<text x="445" y="879" class="bt">Backend tests (pytest)</text>
+<text x="445" y="904" class="bl">Real PostgreSQL test database:</text>
+<text x="445" y="924" class="bl">auth, access rules, pricing, statuses</text>
+<rect x="826" y="852" width="375" height="80" rx="14" fill="#fff" stroke="#6d4fc2" stroke-width="1.5" filter="url(#sh)"/>
+<text x="842" y="879" class="bt">Frontend tests (Vitest)</text>
+<text x="842" y="904" class="bl">Mocked fetch + Testing Library:</text>
+<text x="842" y="924" class="bl">browse, cart, login, checkout, staff</text>
+</svg>
