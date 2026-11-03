@@ -1,0 +1,125 @@
+diff -ruN a/backend/.env.example b/backend/.env.example
+--- a/backend/.env.example	2026-10-31 05:30:53.323474774 +0000
++++ b/backend/.env.example	2026-10-31 05:30:53.325464056 +0000
+@@ -25,6 +25,16 @@
+ 
+ RATE_LIMIT_ENABLED=true
+ 
++# Database connection pool PER API INSTANCE (defaults shown). When you run several instances with
++# cluster/run_cluster.py these are set for you. Total connections = (size + overflow) x instances,
++# and PostgreSQL allows 100 by default.
++# DB_POOL_SIZE=15
++# DB_MAX_OVERFLOW=15
++# DB_POOL_TIMEOUT=10
++
++# Name shown in the X-Instance response header. cluster/run_cluster.py sets it (instance-1, ...).
++# INSTANCE_NAME=
++
+ # Only used by scripts/seed.py. Pick your own value (10+ characters).
+ # The seed script refuses to run with this placeholder.
+ SEED_USER_PASSWORD=change-me-pick-a-seed-password
+diff -ruN a/backend/app/config.py b/backend/app/config.py
+--- a/backend/app/config.py	2026-10-31 05:30:53.309945463 +0000
++++ b/backend/app/config.py	2026-10-31 05:30:53.312020407 +0000
+@@ -20,6 +20,15 @@
+     rate_limit_enabled: bool = True
+     seed_user_password: str | None = None
+ 
++    # Database connection pool, PER API INSTANCE. With several instances the total number of
++    # connections is (db_pool_size + db_max_overflow) x instances, and PostgreSQL allows 100 by
++    # default. cluster/run_cluster.py sets these for you based on how many instances you start.
++    db_pool_size: int = 15
++    db_max_overflow: int = 15
++    db_pool_timeout: int = 10
++    # Shown in the X-Instance response header so you can see which instance answered a request.
++    instance_name: str = ""
++
+     @field_validator("jwt_secret")
+     @classmethod
+     def jwt_secret_must_be_strong(cls, value: str) -> str:
+diff -ruN a/backend/app/database.py b/backend/app/database.py
+--- a/backend/app/database.py	2026-10-31 05:30:53.313525975 +0000
++++ b/backend/app/database.py	2026-10-31 05:30:53.315221020 +0000
+@@ -7,7 +7,12 @@
+ from app.config import get_settings
+ 
+ # hide_parameters=True keeps query values (emails, hashes) out of error messages.
+-engine = create_engine(get_settings().database_url, pool_pre_ping=True, hide_parameters=True)
++_s = get_settings()
++# The pool is sized to the 40 worker threads FastAPI uses for normal routes, so a request does not
++# sit waiting for a free connection. pool_timeout makes an overloaded instance fail fast.
++engine = create_engine(_s.database_url, pool_pre_ping=True, hide_parameters=True,
++                       pool_size=_s.db_pool_size, max_overflow=_s.db_max_overflow,
++                       pool_timeout=_s.db_pool_timeout)
+ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+ 
+ 
+diff -ruN a/backend/app/main.py b/backend/app/main.py
+--- a/backend/app/main.py	2026-10-31 05:30:53.320648273 +0000
++++ b/backend/app/main.py	2026-10-31 05:30:53.321854683 +0000
+@@ -1,12 +1,20 @@
+ """App entry point: wires up CORS, security headers, error handling and routers."""
++import os
++import socket
++
+ from fastapi import FastAPI, Request
+ from fastapi.middleware.cors import CORSMiddleware
++from fastapi.responses import JSONResponse
++from sqlalchemy import text
+ 
+ from app.config import get_settings
++from app.database import engine
+ from app.errors import install_error_handlers
+ from app.routers import auth, orders, restaurants, staff
+ 
+ settings = get_settings()
++# Name of this running copy of the API. Shown in the X-Instance header.
++INSTANCE = settings.instance_name or f"{socket.gethostname()}-{os.getpid()}"
+ 
+ app = FastAPI(
+     title="Food Delivery API",
+@@ -38,6 +46,7 @@
+     response.headers["X-Frame-Options"] = "DENY"
+     response.headers["Referrer-Policy"] = "no-referrer"
+     response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
++    response.headers["X-Instance"] = INSTANCE
+     if request.url.path not in DOCS_PATHS:  # Swagger UI needs to load its own scripts
+         response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+     if settings.cookie_secure:  # only meaningful over HTTPS
+@@ -47,9 +56,22 @@
+ 
+ @app.get("/health", tags=["meta"])
+ def health():
++    """Liveness: this process is running."""
+     return {"status": "ok"}
+ 
+ 
++@app.get("/health/ready", tags=["meta"])
++def ready():
++    """Readiness: this instance can reach the database. The load balancer calls this every
++    couple of seconds and stops sending traffic to an instance that answers 503."""
++    try:
++        with engine.connect() as conn:
++            conn.execute(text("SELECT 1"))
++    except Exception:
++        return JSONResponse({"status": "unavailable"}, status_code=503)  # no details on purpose
++    return {"status": "ready", "instance": INSTANCE}
++
++
+ app.include_router(auth.router)
+ app.include_router(restaurants.router)
+ app.include_router(orders.router)
+diff -ruN a/backend/app/models.py b/backend/app/models.py
+--- a/backend/app/models.py	2026-10-31 05:30:53.317299358 +0000
++++ b/backend/app/models.py	2026-10-31 05:30:53.319040093 +0000
+@@ -103,6 +103,10 @@
+         Index("ix_orders_restaurant_status", "restaurant_id", "status"),
+     )
+ 
++    # Fetch server-generated values (updated_at) in the same UPDATE, so building the response never
++    # needs another database round trip (that extra trip failed when the pool was exhausted).
++    __mapper_args__ = {"eager_defaults": True}
++
+     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+     # RESTRICT: you cannot delete a user or restaurant that has orders.
+     customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))

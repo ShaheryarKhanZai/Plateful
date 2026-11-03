@@ -7,15 +7,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
 
 # hide_parameters=True keeps query values (emails, hashes) out of error messages.
-engine = create_engine(
-    get_settings().database_url,
-    pool_size=20,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=1800,
-    pool_pre_ping=True,
-    hide_parameters=True,
-)
+_s = get_settings()
+# The pool is sized to the 40 worker threads FastAPI uses for normal routes, so a request does not
+# sit waiting for a free connection. pool_timeout makes an overloaded instance fail fast.
+engine = create_engine(_s.database_url, pool_pre_ping=True, hide_parameters=True,
+                       pool_size=_s.db_pool_size, max_overflow=_s.db_max_overflow,
+                       pool_timeout=_s.db_pool_timeout)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 

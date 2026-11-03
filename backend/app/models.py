@@ -103,6 +103,10 @@ class Order(Base):
         Index("ix_orders_restaurant_status", "restaurant_id", "status"),
     )
 
+    # Fetch server-generated values (updated_at) in the same UPDATE, so building the response never
+    # needs another database round trip (that extra trip failed when the pool was exhausted).
+    __mapper_args__ = {"eager_defaults": True}
+
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     # RESTRICT: you cannot delete a user or restaurant that has orders.
     customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))

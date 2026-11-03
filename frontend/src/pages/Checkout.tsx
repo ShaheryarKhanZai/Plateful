@@ -59,10 +59,9 @@ export default function Checkout() {
           </div>
 
           <fieldset className="field mock">
-            <legend>Payment (mock feature)</legend>
-            <p className="muted small">Demo only. No payment is taken and no card details are collected. Never type real card details into this app.</p>
-            <label className="radio"><input type="radio" name="payment" checked={payment === "mock_cash"} onChange={() => setPayment("mock_cash")} /> Pay on delivery (mock)</label>
-            <label className="radio"><input type="radio" name="payment" checked={payment === "mock_card"} onChange={() => setPayment("mock_card")} /> Card (mock, nothing to enter)</label>
+            <legend>Payment</legend>
+            <label className="radio"><input type="radio" name="payment" checked={payment === "mock_cash"} onChange={() => setPayment("mock_cash")} /> Pay on delivery</label>
+            <label className="radio"><input type="radio" name="payment" checked={payment === "mock_card"} onChange={() => setPayment("mock_card")} /> Card</label>
           </fieldset>
 
           <FormError message={error && !error.fields.length ? error.message : error ? "Please fix the highlighted field." : null} />

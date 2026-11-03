@@ -218,6 +218,10 @@ Do these with backend and frontend running and seed data loaded.
 14. **Errors:** stop the backend and refresh the restaurants page. You see "Can't reach the server" with a Try again button. Start it again and click the button.
 15. **Logout:** log out, then press Back. Protected pages send you to log in.
 
+## Running several API instances (high availability)
+
+`cluster/` runs several copies of the API behind a Caddy load balancer, so if one crashes the others keep serving and the crashed one is restarted automatically. The frontend keeps using `http://localhost:8000`. See [cluster/README.md](cluster/README.md).
+
 ## Load testing
 
 `loadtest/` has two programs that simulate customers placing orders and staff processing them, with a settable order rate and number of users. See [loadtest/README.md](loadtest/README.md).

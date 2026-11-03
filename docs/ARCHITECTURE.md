@@ -283,3 +283,67 @@ For example, "restaurant staff can mark a menu item unavailable":
 | `VITE_API_URL` | `frontend/.env.local` | Public value only. Never put secrets in `VITE_` variables. |
 
 Production notes: serve both parts over HTTPS, set `ENVIRONMENT=production` and `COOKIE_SECURE=true`, use a shared store for rate limits, and use separate database logins for migrations and the app. See the **Limitations** section of the main README.
+
+---
+
+## 12. Running several instances (high availability)
+
+The diagram at the top shows one API. To survive a crash, run **several copies** behind a load balancer. Setup steps are in `cluster/README.md`.
+
+```mermaid
+flowchart LR
+    C["Browser, frontend, load tests"] -->|"http://localhost:8000"| LB["Caddy load balancer"]
+    LB -->|"least connections, health checked"| I1["API instance-1 :8001"]
+    LB --> I2["API instance-2 :8002"]
+    LB --> I3["API instance-3 :8003"]
+    I1 --> DB[("PostgreSQL")]
+    I2 --> DB
+    I3 --> DB
+    S["run_cluster.py supervisor"] -. "restarts crashed instances" .-> I1
+    S -.-> I2
+    S -.-> I3
+    S -. "starts and watches" .-> LB
+```
+
+**What happens when an instance crashes**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant LB as Caddy
+    participant A as instance-2 (crashed)
+    participant B as instance-1
+    participant S as run_cluster.py
+    C->>LB: GET /restaurants
+    LB->>A: connect
+    A--xLB: connection refused
+    Note over LB: marks instance-2 unhealthy, retries the same request
+    LB->>B: GET /restaurants
+    B-->>LB: 200 OK
+    LB-->>C: 200 OK (the client never noticed)
+    S->>A: notices the crash, restarts it after 2 seconds
+    LB->>A: health check /health/ready every 2 seconds
+    A-->>LB: 200 ready, back in rotation
+```
+
+**Why this app can scale out so easily**
+
+- The access token is a **stateless JWT**, so any instance can verify it.
+- Refresh tokens, orders and users are **in PostgreSQL**, not in a process's memory.
+- The cart lives in the browser, and the order tracker simply asks the API again.
+- So no "sticky sessions" are needed: the load balancer can send each request anywhere.
+
+**What was added to make it work**
+
+- `/health/ready`: runs `SELECT 1`. The load balancer uses it, so an instance that cannot reach the database stops getting traffic.
+- `X-Instance` header on every response, so you can see which copy answered.
+- Database pool size is now a setting, divided between instances so the total stays under PostgreSQL's 100 connections.
+- `run_cluster.py`: starts the instances and Caddy, and restarts any that die.
+
+**Known limits** (also in the cluster README)
+
+- A request that was in flight on the instance when it crashed fails. Caddy does not re-send it, because re-sending `POST /orders` could create a duplicate order.
+- The rate limiter counts per instance, so limits are looser than with one instance. A shared store (Redis or the database) would fix this.
+- The load balancer, PostgreSQL and the single computer are still single points of failure. This design protects against API process crashes, not machine or database failure.
+- The diagram image `architecture.svg` still shows the single-instance view.

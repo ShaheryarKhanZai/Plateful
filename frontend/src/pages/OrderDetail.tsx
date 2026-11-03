@@ -52,7 +52,7 @@ export default function OrderDetail() {
         <dl className="facts">
           <dt>Delivering to</dt><dd>{live.delivery_address}</dd>
           {live.note && (<><dt>Your note</dt><dd>{live.note}</dd></>)}
-          <dt>Payment</dt><dd>{live.payment_method === "mock_cash" ? "Pay on delivery (mock)" : "Card (mock)"}. No real payment was taken.</dd>
+          <dt>Payment</dt><dd>{live.payment_method === "mock_cash" ? "Cash on delivery" : "Card"}</dd>
         </dl>
         <FormError message={cancelError} />
         {live.status === "pending" && (

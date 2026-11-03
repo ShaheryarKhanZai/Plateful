@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     seed_user_password: str | None = None
 
+    # Database connection pool, PER API INSTANCE. With several instances the total number of
+    # connections is (db_pool_size + db_max_overflow) x instances, and PostgreSQL allows 100 by
+    # default. cluster/run_cluster.py sets these for you based on how many instances you start.
+    db_pool_size: int = 15
+    db_max_overflow: int = 15
+    db_pool_timeout: int = 10
+    # Shown in the X-Instance response header so you can see which instance answered a request.
+    instance_name: str = ""
+
     @field_validator("jwt_secret")
     @classmethod
     def jwt_secret_must_be_strong(cls, value: str) -> str:
