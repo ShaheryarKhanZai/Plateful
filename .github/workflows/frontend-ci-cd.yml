@@ -1,0 +1,157 @@
+# Frontend CI/CD for Plateful (Vite + React + TypeScript).
+#
+#   pull_request -> main :  test + audit + build        (never deploys)
+#   push         -> main :  test + audit + build + deploy to S3 website hosting
+#
+# AWS auth uses GitHub OIDC (no access keys). See docs/frontend-cicd-setup.md.
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend-ci-cd.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend-ci-cd.yml"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: frontend
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test # vitest run
+
+  security:
+    name: Security audit (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm audit --audit-level=high
+
+  build:
+    name: Build
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    outputs:
+      zip_name: ${{ steps.version.outputs.zip_name }}
+    env:
+      # Baked into the public JS bundle at build time. Not a secret.
+      VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:8000' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Require VITE_API_URL for deployable builds
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "${{ vars.VITE_API_URL }}" ]; then
+            echo "::error::Repository variable VITE_API_URL is not set; refusing to build a deployable bundle that points at localhost."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run build # tsc --noEmit && vite build -> frontend/dist
+
+      - name: Create versioned ZIP
+        id: version
+        run: |
+          ZIP_NAME="plateful-frontend-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.zip"
+          mkdir -p ../release
+          (cd dist && zip -qr "../../release/${ZIP_NAME}" .)
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: frontend/dist
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: release/${{ steps.version.outputs.zip_name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to S3
+    needs: build
+    # Only pushes to main. Pull requests never reach this job.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required to request the GitHub OIDC token
+      contents: read
+    concurrency:
+      group: frontend-deploy
+      cancel-in-progress: false
+    env:
+      S3_BUCKET: ${{ vars.S3_BUCKET }}
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: release
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload versioned ZIP artifact
+        run: |
+          aws s3 cp "release/${{ needs.build.outputs.zip_name }}" \
+            "s3://${S3_BUCKET}/artifacts/frontend/${{ needs.build.outputs.zip_name }}"
+
+      - name: Deploy static site
+        run: |
+          # 1) Hashed assets: long-lived cache. Keep the artifacts/ prefix out of the sync/delete.
+          aws s3 sync dist "s3://${S3_BUCKET}" --delete \
+            --exclude "artifacts/*" --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+          # 2) index.html last, never cached, so users pick up the new bundle immediately.
+          aws s3 cp dist/index.html "s3://${S3_BUCKET}/index.html" \
+            --cache-control "no-cache" --content-type "text/html; charset=utf-8"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Frontend deployed"
+            echo "- Commit: \`${GITHUB_SHA::7}\`"
+            echo "- Build ZIP: \`s3://${S3_BUCKET}/artifacts/frontend/${{ needs.build.outputs.zip_name }}\`"
+            echo "- Site: S3 console > bucket > Properties > Static website hosting endpoint"
+          } >> "$GITHUB_STEP_SUMMARY"
