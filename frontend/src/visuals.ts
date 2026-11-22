@@ -1,8 +1,8 @@
 /** Decorative helpers. There are no photos in this demo, so each restaurant gets a
  *  colour theme and food emoji. Colours are dark enough for white text on top. */
 const THEMES: [string, string][] = [
-  ["#C2410C", "#9D174D"], ["#047857", "#0E5A7A"], ["#5B3FD1", "#2F4BB8"],
-  ["#B45309", "#BE123C"], ["#1D6FC4", "#0F4C8A"], ["#BE185D", "#6D28D9"],
+  ["#D9381E", "#B3261E"], ["#1D7A4D", "#0F5A35"], ["#5B3FD1", "#3A28A8"],
+  ["#C2570C", "#9A3F06"], ["#2A44D6", "#1B2FA0"], ["#C2185B", "#8E1043"],
 ];
 // Cuisine decides the colours when we know it (spice = orange, noodles = violet, ...),
 // so neighbouring cards don't look alike. Unknown cuisines fall back to a name-based pick.
